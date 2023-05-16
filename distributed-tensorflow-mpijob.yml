@@ -1,0 +1,59 @@
+apiVersion: kubeflow.org/v1
+kind: MPIJob
+metadata:
+  name: distributed-tensorflow
+spec:
+  slotsPerWorker: 1 # GPUs per worker pod
+  runPolicy:
+    cleanPodPolicy: Running
+  mpiReplicaSpecs:
+    Launcher:
+      template:
+        spec:
+          containers:
+          - image: quay.io/dfeddema/horovod/horovod
+            name: horovod
+            command:
+            - mpirun
+            args:
+            - --allow-run-as-root
+            - python3
+            - /workspace/benchmarks/scripts/tf_cnn_benchmarks/tf_cnn_benchmarks.py
+            - --data_format=NCHW
+            - --batch_size=128
+            - --model=resnet50
+            - --optimizer=momentum
+            - --variable_update=horovod
+            - --local_parameter_device=gpu
+            - --nodistortions
+            - --gradient_repacking=2
+            - --num_epochs=2
+            - --weight_decay=1e-4
+            - --use_fp16=True
+            - --per_gpu_thread_count=1
+    Worker:
+      replicas: 2 # Number of workers to spawn
+      template:
+        spec:
+          initContainers:
+          - name: init-git
+            image: quay.io/dfeddema/alpine/git
+            command:
+            - /bin/sh
+            - -c
+            - git clone https://github.com/tensorflow/benchmarks.git /init/benchmarks
+            volumeMounts:
+            - name: init-volume
+              mountPath: /init
+          containers:
+          - image: horovod/horovod
+            name: horovod
+            resources:
+              limits:
+                nvidia.com/gpu: 1 # Should match slotsPerWorker above
+            volumeMounts:
+             - name: init-volume
+               mountPath: /workspace
+          volumes:
+          - name: init-volume
+            emptyDir: {}
