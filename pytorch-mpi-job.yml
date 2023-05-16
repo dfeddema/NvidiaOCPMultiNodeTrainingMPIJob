@@ -1,0 +1,58 @@
+apiVersion: kubeflow.org/v1
+kind: MPIJob
+metadata:
+  name: distributed-pytorch
+spec:
+  slotsPerWorker: 1 # GPUs per worker pod
+  runPolicy:
+    cleanPodPolicy: Running
+  mpiReplicaSpecs:
+    Launcher:
+      replicas: 1
+      template:
+        spec:
+          containers:
+          - image: horovod/horovod
+            name: horovod
+            command:
+            - mpirun
+            args:
+            - --allow-run-as-root
+            - python
+            - pytorch/pytorch_imagenet_resnet50.py
+            - --train-dir=/images/tiny-imagenet-200/train
+            - --val-dir=/images/tiny-imagenet-200/val
+            - --log-dir=/images/tiny-imagenet-200
+            - --checkpoint-format=/images/checkpoint-{epoch}.pth.tar
+    Worker:
+      replicas: 3 # Number of workers to spawn
+      template:
+        spec:
+          restartPolicy: Never
+          initContainers:
+          - name: alpine
+            image: alpine
+            command:
+            - /bin/sh
+            - -c
+            - "cd /init && wget http://cs231n.stanford.edu/tiny-imagenet-200.zip && unzip tiny-imagenet-200.zip"
+            volumeMounts:
+            - name: init-volume
+              mountPath: /init
+          containers:
+          - name: horovod
+            image: horovod/horovod
+            resources:
+              limits:
+                nvidia.com/gpu: 1
+            volumeMounts:
+            - mountPath: /dev/shm
+              name: dshm
+            - name: init-volume
+              mountPath: /images
+          volumes:
+          - emptyDir:
+              medium: Memory
+            name: dshm
+          - name: init-volume
+            emptyDir: {}
