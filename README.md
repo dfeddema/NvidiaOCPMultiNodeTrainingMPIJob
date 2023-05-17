@@ -3,6 +3,6 @@ Nvidia multi-node ResNet50 training example for Openshift using Horovod, MPI, Te
 
 
 Note: The dockerfile for the horovod image is in this repository 
-[horovod/horovod](https://github.com/horovod/horovod/blob/master/docker/horovod/Dockerfile)_.
+[horovod/horovod](https://github.com/horovod/horovod/blob/master/docker/horovod/Dockerfile).
 
 
